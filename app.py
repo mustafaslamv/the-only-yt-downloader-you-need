@@ -37,6 +37,50 @@ PROBE_KEY = "probe"
 PROBE_URL_KEY = "probe_url"
 VISIBLE_LIMIT_KEY = "visible_limit"
 HIDDEN_SELECTION_KEY = "sel_hidden"
+NAV_KEY = "nav_page"
+
+PAGE_DOWNLOAD = "Download"
+PAGE_HISTORY = "Download history"
+
+SIDEBAR_HEADER = """
+<div style="display:flex;align-items:center;gap:14px;padding:4px 0 20px 0;">
+  <svg width="66" height="47" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="YouTube logo" style="flex:0 0 auto;">
+    <path fill="#FF0000" d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.4.6A3 3 0 0 0 .5 6.2 31.5 31.5 0 0 0 0 12a31.5 31.5 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.6 9.4.6 9.4.6s7.5 0 9.4-.6a3 3 0 0 0 2.1-2.1A31.5 31.5 0 0 0 24 12a31.5 31.5 0 0 0-.5-5.8z"/>
+    <path fill="#FFFFFF" d="M9.5 15.6V8.4L15.8 12z"/>
+  </svg>
+  <div style="color:#FFFFFF;font-size:1.6rem;line-height:1.12;font-weight:800;white-space:nowrap;">YouTube<br>Downloader</div>
+</div>
+"""
+
+SIDEBAR_CSS = """
+<style>
+[data-testid="stSidebar"] label {
+  color: #FFFFFF;
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 8px;
+}
+[data-testid="stSidebar"] label:has(input:checked) {
+  background-color: rgba(255, 255, 255, 0.12);
+  font-weight: 600;
+}
+[data-testid="stSidebar"] {
+  position: relative;
+}
+[data-testid="stSidebarContent"] {
+  padding-bottom: 76px;
+}
+[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(button) {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 12px 30px 18px;
+  background-color: #192638;
+  z-index: 3;
+}
+</style>
+"""
 
 DEFAULT_VISIBLE_ENTRIES = 100
 MAX_VISIBLE_ENTRIES = 500
@@ -317,20 +361,21 @@ def render_advanced() -> Dict[str, Any]:
     }
 
 
-def render_history() -> None:
+def render_history_page() -> None:
+    st.title("Download history")
     entries = history_store.load()
-    with st.expander(f"Download history ({len(entries)})"):
-        if not entries:
-            st.caption("Nothing here yet.")
-            return
-        for entry in entries:
-            when = entry.timestamp.replace("T", " ")[:19]
-            size = fmt_size(entry.size_bytes)
-            status = {"finished": "done", "stopped": "stopped", "error": "failed"}.get(entry.status, entry.status)
-            st.markdown(f"**{entry.title}**")
-            st.caption(f"{when} UTC · {entry.mode} · {entry.format} · {entry.items} item(s) · {size} · {status}")
-            if entry.detail:
-                st.caption(entry.detail)
+    if not entries:
+        st.info("Nothing here yet. Your downloads will show up here.")
+        return
+    st.caption(f"Your last {len(entries)} download attempt(s), newest first (times are UTC).")
+    for entry in entries:
+        when = entry.timestamp.replace("T", " ")[:19]
+        size = fmt_size(entry.size_bytes)
+        status = {"finished": "done", "stopped": "stopped", "error": "failed"}.get(entry.status, entry.status)
+        st.markdown(f"**{entry.title}**")
+        st.caption(f"{when} UTC · {entry.mode} · {entry.format} · {entry.items} item(s) · {size} · {status}")
+        if entry.detail:
+            st.caption(entry.detail)
 
 
 # --------------------------------------------------------------------------- download job
@@ -480,6 +525,27 @@ def arm_server_shutdown() -> None:
     threading.Thread(target=terminate, name="server-shutdown", daemon=True).start()
 
 
+def render_sidebar() -> str:
+    """Render the left menu and return the selected page."""
+    st.sidebar.markdown(SIDEBAR_HEADER, unsafe_allow_html=True)
+    page = st.sidebar.radio(
+        "Menu",
+        (PAGE_DOWNLOAD, PAGE_HISTORY),
+        key=NAV_KEY,
+        label_visibility="collapsed",
+    )
+
+    stopping_server = bool(st.session_state.get(STOPPING_KEY))
+    if st.sidebar.button("Stop server", width="stretch", disabled=stopping_server):
+        st.session_state[STOPPING_KEY] = True
+        stopping_server = True
+    if stopping_server:
+        arm_server_shutdown()
+        st.sidebar.warning("Stopping the server...")
+
+    return page or PAGE_DOWNLOAD
+
+
 # --------------------------------------------------------------------------- main
 
 
@@ -601,11 +667,25 @@ def render_wizard() -> None:
             st.session_state[JOB_KEY] = start_download(request, meta)
             st.rerun()
 
-    render_history()
-
 
 def main() -> None:
     st.set_page_config(page_title="YouTube Downloader", page_icon="⬇️", layout="centered")
+    st.markdown(SIDEBAR_CSS, unsafe_allow_html=True)
+    page = render_sidebar()
+
+    if st.session_state.get(STOPPING_KEY):
+        st.warning("Stopping the server. This page will disconnect in a moment.")
+
+    job = st.session_state.get(JOB_KEY)
+
+    if page == PAGE_HISTORY:
+        if job is not None:
+            if job["status"] == "running":
+                render_running_job()
+            else:
+                render_job_result(job)
+        render_history_page()
+        return
 
     st.title("YouTube Downloader")
     st.caption("Download a video, a playlist, or just the music. Pick the format, fetch, then start.")
@@ -615,18 +695,6 @@ def main() -> None:
 
     st.info("Use this for content you are allowed to download.")
 
-    st.sidebar.caption(f"Server PID: {os.getpid()}")
-    stopping_server = bool(st.session_state.get(STOPPING_KEY))
-    if st.sidebar.button("Stop server", width="stretch", disabled=stopping_server):
-        st.session_state[STOPPING_KEY] = True
-        stopping_server = True
-
-    if stopping_server:
-        arm_server_shutdown()
-        st.sidebar.warning("Stopping the server...")
-        st.warning("Stopping the server. This page will disconnect in a moment.")
-
-    job = st.session_state.get(JOB_KEY)
     if job is not None:
         if job["status"] == "running":
             render_running_job()

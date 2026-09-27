@@ -9,3 +9,9 @@ hideWelcomeMessage = true
 
 [server]
 showEmailPrompt = false
+
+[theme.sidebar]
+backgroundColor = "#192638"
+textColor = "#FFFFFF"
+secondaryBackgroundColor = "#24344D"
+primaryColor = "#FF0000"

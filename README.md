@@ -1,5 +1,7 @@
 # YouTube Downloader
 
+![YouTube Downloader app](info.png)
+
 Download YouTube videos, playlists and music straight to your computer. You paste a link, pick a few options, and the file shows up in a folder you choose.
 
 ## Before you start (one time)
@@ -20,7 +22,7 @@ bash run.sh
 
 This sets everything up and starts the app. Click the link it prints (it usually opens your browser by itself).
 
-To close the app later, click **Stop server** in the left sidebar.
+The left menu has two tabs: **Download** (the downloader you will use most) and **Download history** (what you downloaded before). **Stop server** sits at the bottom of that menu — click it to close the app.
 
 ## Download your first video
 
@@ -40,7 +42,7 @@ Choose `Playlist` in step 2, paste the playlist link, click **Fetch details**, l
 Only want a few songs? Click **Select none**, then tick just the ones you want.
 
 **Get only the music (MP3 with the cover picture)**
-Choose `Music`, keep `MP3`, click **Start download**. The cover art and the title are saved inside the file automatically.
+Choose `Music`, keep `MP3`, and pick your `Audio quality` — `High (320 kbps)` for the best sound, down to `Economy (128 kbps)` for the smallest file. Click **Start download**: the cover art and the title are saved inside the file automatically.
 
 **Make files smaller**
 - Video: set `Video quality` to `Up to HD (720p)` or lower.
@@ -65,7 +67,7 @@ Open `Advanced options` → set `Max download speed` (for example `2` for 2 MB/s
 Click **Stop download** at the top, then **Dismiss** when it says it stopped.
 
 **Check what you downloaded before**
-Open `Download history` at the bottom of the page.
+Click `Download history` in the left menu.
 
 ## If something goes wrong
 

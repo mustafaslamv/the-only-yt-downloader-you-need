@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 from streamlit.testing.v1 import AppTest
 
+from youtube_downloader.history import HistoryEntry
 from youtube_downloader.models import PlaylistEntry, ProbeKind, ProbeResult
 
 APP_PATH = Path(__file__).resolve().parents[1] / "app.py"
@@ -137,6 +138,60 @@ class AppWizardTests(unittest.TestCase):
         self.assertIn("Skip files that already exist in the folder", labels)
         number_labels = [number_input.label for number_input in self.at.number_input]
         self.assertTrue(any("Max download speed" in label for label in number_labels))
+
+
+class SidebarTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self._ffmpeg = patch("youtube_downloader.checks.ffmpeg_available", return_value=True)
+        self._ffmpeg.start()
+        self.addCleanup(self._ffmpeg.stop)
+        self.at = AppTest.from_file(str(APP_PATH), default_timeout=15)
+
+    def test_sidebar_shows_brand_tabs_and_stop_button(self) -> None:
+        self.at.run()
+
+        self.assertEqual(self.at.exception, [])
+        header = " ".join(str(markdown.value) for markdown in self.at.sidebar.markdown)
+        self.assertIn("YouTube", header)
+        self.assertIn("Downloader", header)
+        nav = self.at.sidebar.radio[0]
+        self.assertEqual(list(nav.options), ["Download", "Download history"])
+        self.assertEqual(nav.value, "Download")
+        self.assertIn("Stop server", [button.label for button in self.at.sidebar.button])
+
+    def test_download_is_the_default_page(self) -> None:
+        self.at.run()
+
+        self.assertEqual(self.at.exception, [])
+        self.assertEqual([title.value for title in self.at.title], ["YouTube Downloader"])
+
+    def test_history_page_renders_saved_entries(self) -> None:
+        entry = HistoryEntry(
+            url="https://www.youtube.com/watch?v=abc123",
+            title="My Old Download",
+            kind="video",
+            mode="music",
+            format="MP3",
+            status="finished",
+            output_dir="/tmp",
+        )
+        with patch("youtube_downloader.history.load", return_value=[entry]):
+            self.at.run()
+            self.at.sidebar.radio(key="nav_page").set_value("Download history").run()
+
+        self.assertEqual(self.at.exception, [])
+        self.assertEqual([title.value for title in self.at.title], ["Download history"])
+        markdown = " ".join(str(item.value) for item in self.at.markdown)
+        self.assertIn("My Old Download", markdown)
+
+    def test_history_page_shows_empty_state(self) -> None:
+        with patch("youtube_downloader.history.load", return_value=[]):
+            self.at.run()
+            self.at.sidebar.radio(key="nav_page").set_value("Download history").run()
+
+        self.assertEqual(self.at.exception, [])
+        infos = [info.value for info in self.at.info]
+        self.assertTrue(any("Nothing here yet" in value for value in infos))
 
 
 if __name__ == "__main__":
