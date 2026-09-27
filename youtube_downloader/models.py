@@ -1,14 +1,19 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, List, Optional, Tuple
 
 
 class DownloadMode(str, Enum):
     VIDEO = "video"
     AUDIO = "audio"
+
+
+class ProbeKind(str, Enum):
+    VIDEO = "video"
+    PLAYLIST = "playlist"
 
 
 @dataclass(frozen=True)
@@ -19,6 +24,44 @@ class DownloadRequest:
     playlist: bool = False
     video_quality_key: str = "best"
     audio_quality_key: str = "320"
+    audio_format: str = "mp3"
+    video_container: str = "mp4"
+    embed_thumbnail: bool = True
+    embed_metadata: bool = True
+    subtitles: bool = False
+    subtitle_languages: Tuple[str, ...] = ("en",)
+    auto_subtitles: bool = False
+    embed_subtitles: bool = False
+    sponsorblock_categories: Tuple[str, ...] = ()
+    playlist_items: str = ""
+    skip_existing: bool = False
+    rate_limit_bps: int = 0
+    cookies_from_browser: str = ""
+
+
+@dataclass(frozen=True)
+class PlaylistEntry:
+    index: int
+    id: str
+    title: str
+    url: str
+    duration: Optional[int] = None
+
+
+@dataclass(frozen=True)
+class ProbeResult:
+    kind: ProbeKind
+    url: str
+    title: str
+    uploader: Optional[str] = None
+    duration: Optional[int] = None
+    thumbnail_url: Optional[str] = None
+    entry_count: int = 0
+    entries: Tuple[PlaylistEntry, ...] = field(default_factory=tuple)
+
+    @property
+    def is_playlist(self) -> bool:
+        return self.kind is ProbeKind.PLAYLIST
 
 
 @dataclass(frozen=True)
